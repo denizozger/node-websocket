@@ -1,4 +1,4 @@
-var WebSocketServer = require('ws').Server
+var webSocketServer = require('ws').Server
   , http = require('http')
   , express = require('express')
   , app = express()
@@ -18,23 +18,14 @@ server.listen(port);
 
 console.log('HTTP server listening on port %d', port);
 
-var websocketServer = new WebSocketServer({server: server});
+var webSocketServer = new webSocketServer({server: server});
 console.log('WebSocket server created');
 
 var matchData;
-var clients = [];
-
-function removeFromArray(arr, item) {
-    for(var i = arr.length; i--;) {
-        if(arr[i] === item) {
-            arr.splice(i, 1);
-        }
-    }
-}
-
+var webSocketClients = [];
 var matches = {};
 
-// Receiving new data and pushing it to connected clients
+// Receiving new data and pushing it to connected webSocketClients
 app.post("/match/:id", function(req, res) {
   var matchId = req.params.id;
   matchData = req.body.newMatchData;
@@ -43,8 +34,8 @@ app.post("/match/:id", function(req, res) {
 
   matches[matchId] = matchData;
 
-   if (clients !== undefined) { // if at least one client is connected
-      websocketServer.broadcast(JSON.stringify(matchData));
+   if (webSocketClients !== undefined) { // if at least one client is connected
+      webSocketServer.broadcast(JSON.stringify(matchData));
    }
 
    consoleLogMatch();
@@ -55,34 +46,40 @@ app.post("/match/:id", function(req, res) {
 });
 
 // Client connection
-websocketServer.on('connection', function(client) {
+webSocketServer.on('connection', function(webSocketClient) {
     console.log('WebSocket connection open'); 
     
-    clients.push(client);
+    webSocketClients.push(webSocketClient);
 
-    console.log('clients size: ' + clients.length);
+    console.log('webSocketClients size: ' + webSocketClients.length);
 
-    for(var i in this.clients) {
-        console.log(this.clients[i]._socket._connecting);
+    for(var i in this.webSocketClients) {
+        console.log(this.webSocketClients[i]._socket._connecting);
     }
     
-    client.send(JSON.stringify('Some initial data'), function() { });
+    webSocketClient.send(JSON.stringify('Some initial data'), function() { });
 
-    client.on('close', function() {
+    webSocketClient.on('close', function() {
         console.log('WebSocket connection close');
-        removeFromArray(clients, client);
+        removeFromArray(webSocketClients, webSocketClient);
 
-        console.log('clients size: ' + clients.length);
+        console.log('webSocketClients size: ' + webSocketClients.length);
     });
 });
 
-websocketServer.broadcast = function(data) {
-    for(var i in this.clients) {
-        this.clients[i].send(data);
+webSocketServer.broadcast = function(data) {
+    for(var j in webSocketClients) {
+        webSocketClients[j].send(data);
     }
 };
 
-
+function removeFromArray(arr, item) {
+    for(var i = arr.length; i--;) {
+        if(arr[i] === item) {
+            arr.splice(i, 1);
+        }
+    }
+}
 
 var consoleLogMatch = function() {
   console.log('Current Match object:');
