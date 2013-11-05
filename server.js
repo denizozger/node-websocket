@@ -1,8 +1,8 @@
 var WebSocketServer = require('ws').Server
-  , http = require('http')
-  , express = require('express')
-  , app = express()
-  , port = process.env.PORT || 5000;
+, http = require('http')
+, express = require('express')
+, app = express()
+, port = process.env.PORT || 5000;
 
 app.use(express.static(__dirname + '/'));
 
@@ -21,52 +21,97 @@ console.log('HTTP server listening on port %d', port);
 var webSocketServer = new WebSocketServer({server: server});
 console.log('WebSocket server created');
 
-var matchData;
-var matches = {};
+var matchData = {};
+var matchClients = {};
 
-// Receiving new data and pushing it to connected clients
+// Receiving new match data and pushing it to clients who are connected to that match's stream
 app.post("/match/:id", function(req, res) {
-   var matchId = req.params.id;
-   matchData = req.body.newMatchData;
+ var matchId = req.params.id;
+ var newMatchData = req.body.newMatchData;
 
-   console.log("Received match details (%s) for match id (%s)", matchData, matchId);
+ console.log("Received match details (%s) for match id (%s)", newMatchData, matchId);
 
-   matches[matchId] = matchData;
+ matchData[matchId] = newMatchData;
 
-   webSocketServer.broadcast(JSON.stringify(matchData));
+ var clientsWatchingThisMatch = matchClients[matchId];
 
-   consoleLogMatch();
+ for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
+  var watchingClient = clientsWatchingThisMatch[i];
 
-   res.writeHead(200, {"Content-Type": "text/plain"});
-   res.write("Received match details " + matchData + " for match id " + matchData);
-   res.end();
+  watchingClient.send(JSON.stringify(newMatchData));
+ }
+
+ consoleLogMatch();
+
+ res.writeHead(200, {"Content-Type": "text/plain"});
+ res.write("Received match details " + newMatchData + " for match id " + newMatchData);
+ res.end();
 });
 
-// Client connection
+// Handling clients requesting match data
 webSocketServer.on('connection', function(webSocketClient) {
-    console.log('New WebSocket connection'); 
+  console.log('New WebSocket connection'); 
 
-    var matchId = webSocketClient.upgradeReq.url.substring(1);
+  var matchId = webSocketClient.upgradeReq.url.substring(1);
 
-    console.log('Requested match id: ' + matchId);
-    console.log('WebSocket connections size: ' + webSocketServer.clients.length);
+  console.log('Requested match id: ' + matchId);
+  console.log('WebSocket connections size: ' + webSocketServer.clients.length);
 
-    webSocketClient.send(JSON.stringify('Some initial data'), function() { });
+
+  var requestedMatchsCurrentClients = matchClients[matchId];
+
+    if (requestedMatchsCurrentClients === undefined) { // this is the first client requesting this match
+      requestedMatchsCurrentClients = []; 
+    } 
+
+    requestedMatchsCurrentClients.push(webSocketClient);
+
+    matchClients[matchId] = requestedMatchsCurrentClients;
+
+    console.log(matchClients);
+
+    webSocketClient.send(JSON.stringify('Curent match data'), function() { });
 
     webSocketClient.on('close', function() {
-        console.log('WebSocket connection closed');
-        console.log('WebSocket connections size: ' + webSocketServer.clients.length);
-    });
-});
 
-webSocketServer.broadcast = function(data) {
-    for(var j in webSocketServer.clients) {
-        webSocketServer.clients[j].send(data);
-    }
-};
+      removeClientFromMatchClients(this);
+
+      console.log('WebSocket connection closed');
+      console.log('WebSocket connections size: ' + webSocketServer.clients.length);
+      console.log('Match clients object:');
+      console.log(matchClients);
+    });
+  });
 
 var consoleLogMatch = function() {
   console.log('Current Match object:');
-  console.log(JSON.stringify(matches, null, 4)); 
+  console.log(JSON.stringify(matchData, null, 4)); 
 }
 
+var removeClientFromMatchClients = function(leavingClient) {
+  for(var matchId in matchClients){
+
+    var clientsWatchingThisMatch = matchClients[matchId];
+
+    for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
+      var client = clientsWatchingThisMatch[i]
+      
+      if (client === leavingClient) {
+        removeFromArray(clientsWatchingThisMatch, client);
+        console.log('Removed the leaving client from MatchClients object');
+
+        if (clientsWatchingThisMatch.length == 0) { // delete the match from MatchClients completely
+          delete matchClients[matchId];
+        }
+      }
+    }
+  }    
+}
+
+function removeFromArray(arr, item) {
+  for(var i = arr.length; i--;) {
+    if(arr[i] === item) {
+      arr.splice(i, 1);
+    }
+  }
+}
