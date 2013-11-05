@@ -1,4 +1,4 @@
-var webSocketServer = require('ws').Server
+var WebSocketServer = require('ws').Server
   , http = require('http')
   , express = require('express')
   , app = express()
@@ -18,25 +18,22 @@ server.listen(port);
 
 console.log('HTTP server listening on port %d', port);
 
-var webSocketServer = new webSocketServer({server: server});
+var webSocketServer = new WebSocketServer({server: server});
 console.log('WebSocket server created');
 
 var matchData;
-var webSocketClients = [];
 var matches = {};
 
-// Receiving new data and pushing it to connected webSocketClients
+// Receiving new data and pushing it to connected clients
 app.post("/match/:id", function(req, res) {
-  var matchId = req.params.id;
-  matchData = req.body.newMatchData;
+   var matchId = req.params.id;
+   matchData = req.body.newMatchData;
 
-  console.log("Received match details (%s) for match id (%s)", matchData, matchId);
+   console.log("Received match details (%s) for match id (%s)", matchData, matchId);
 
-  matches[matchId] = matchData;
+   matches[matchId] = matchData;
 
-   if (webSocketClients !== undefined) { // if at least one client is connected
-      webSocketServer.broadcast(JSON.stringify(matchData));
-   }
+   webSocketServer.broadcast(JSON.stringify(matchData));
 
    consoleLogMatch();
 
@@ -47,39 +44,26 @@ app.post("/match/:id", function(req, res) {
 
 // Client connection
 webSocketServer.on('connection', function(webSocketClient) {
-    console.log('WebSocket connection open'); 
-    
-    webSocketClients.push(webSocketClient);
+    console.log('New WebSocket connection'); 
 
-    console.log('webSocketClients size: ' + webSocketClients.length);
+    var matchId = webSocketClient.upgradeReq.url.substring(1);
 
-    for(var i in this.webSocketClients) {
-        console.log(this.webSocketClients[i]._socket._connecting);
-    }
-    
+    console.log('Requested match id: ' + matchId);
+    console.log('WebSocket connections size: ' + webSocketServer.clients.length);
+
     webSocketClient.send(JSON.stringify('Some initial data'), function() { });
 
     webSocketClient.on('close', function() {
-        console.log('WebSocket connection close');
-        removeFromArray(webSocketClients, webSocketClient);
-
-        console.log('webSocketClients size: ' + webSocketClients.length);
+        console.log('WebSocket connection closed');
+        console.log('WebSocket connections size: ' + webSocketServer.clients.length);
     });
 });
 
 webSocketServer.broadcast = function(data) {
-    for(var j in webSocketClients) {
-        webSocketClients[j].send(data);
+    for(var j in webSocketServer.clients) {
+        webSocketServer.clients[j].send(data);
     }
 };
-
-function removeFromArray(arr, item) {
-    for(var i = arr.length; i--;) {
-        if(arr[i] === item) {
-            arr.splice(i, 1);
-        }
-    }
-}
 
 var consoleLogMatch = function() {
   console.log('Current Match object:');

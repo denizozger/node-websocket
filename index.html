@@ -18,8 +18,15 @@
     </style>
 
     <script>
-      var host = location.origin.replace(/^http/, 'ws')
+     /*
+      * Assume url is http://localhost:5000/?1985
+      * Below code establishes a websocket connection to ws://localhost:5000/1985
+      */ 
+      var host = location.origin.replace(/^http/, 'ws');
+      host = host + '/' + location.search.substring(1);
+
       var ws = new WebSocket(host);
+      
       ws.onmessage = function (event) {
         var li = document.createElement('li');
         li.innerHTML = JSON.parse(event.data);
