@@ -23,12 +23,12 @@
       ws.onmessage = function (event) {
         var li = document.createElement('li');
         li.innerHTML = JSON.parse(event.data);
-        document.querySelector('#pings').appendChild(li);
+        document.querySelector('#events').appendChild(li);
       };
     </script>
   </head>
   <body>
-    <h1>Pings</h1>
-    <ul id='pings'></ul>
+    <h1>Match centre</h1>
+    <ul id='events'></ul>
   </body>
 </html>
