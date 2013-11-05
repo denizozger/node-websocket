@@ -18,7 +18,7 @@ server.listen(port);
 
 console.log('HTTP server listening on port %d', port);
 
-var wss = new WebSocketServer({server: server});
+var websocketServer = new WebSocketServer({server: server});
 console.log('WebSocket server created');
 
 var matchData;
@@ -32,21 +32,30 @@ function removeFromArray(arr, item) {
     }
 }
 
+var matches = {};
+
 // Receiving new data and pushing it to connected clients
-app.post("/match", function(req, res) {
-   matchData = req.body.newMatchData;
+app.post("/match/:id", function(req, res) {
+  var matchId = req.params.id;
+  matchData = req.body.newMatchData;
+
+  console.log("Received match details (%s) for match id (%s)", matchData, matchId);
+
+  matches[matchId] = matchData;
 
    if (clients !== undefined) { // if at least one client is connected
-      wss.broadcast(JSON.stringify(matchData));
+      websocketServer.broadcast(JSON.stringify(matchData));
    }
 
+   consoleLogMatch();
+
    res.writeHead(200, {"Content-Type": "text/plain"});
-   res.write("Received match details (" + matchData + ")");
-   res.end(); 
+   res.write("Received match details " + matchData + " for match id " + matchData);
+   res.end();
 });
 
 // Client connection
-wss.on('connection', function(client) {
+websocketServer.on('connection', function(client) {
     console.log('WebSocket connection open'); 
     
     clients.push(client);
@@ -67,10 +76,16 @@ wss.on('connection', function(client) {
     });
 });
 
-wss.broadcast = function(data) {
+websocketServer.broadcast = function(data) {
     for(var i in this.clients) {
         this.clients[i].send(data);
     }
 };
 
+
+
+var consoleLogMatch = function() {
+  console.log('Current Match object:');
+  console.log(JSON.stringify(matches, null, 4)); 
+}
 
