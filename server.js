@@ -9,6 +9,7 @@ var WebSocketServer = require('ws').Server,
   port = process.env.PORT || 5000;
 
 app.use(express.static(__dirname + '/'));
+app.enable('trust proxy');
 
 app.use(function (err, req, res, next) {
   console.error(err.stack);
@@ -22,10 +23,14 @@ server.listen(port);
 
 console.log('HTTP server listening on port %d', port);
 
+// Security settings, do not initialise it if you want to allow all IPs
+var allowedIPaddressesThatCanPushMatchData; 
+
+// Initiate the server
 var webSocketServer = new WebSocketServer({
   server: server
 });
-console.log('WebSocket server created');
+console.log('WebSocket server created, allowing incoming match data from ' + JSON.stringify(allowedIPaddressesThatCanPushMatchData));
 
 /**
  * Data models that hold match -> matchdata, and match -> clients data
@@ -39,11 +44,24 @@ var matchClients = {};
  * Form data should contain match data.
  */
 app.post('/match/:id', function (req, res) {
+  var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
+
+  if (allowedIPaddressesThatCanPushMatchData && _.indexOf(allowedIPaddressesThatCanPushMatchData, ip) === -1) {
+    console.log('Unknown server (%s) tried to post match data', ip);
+    res.writeHead(403, {
+      'Content-Type': 'text/plain'
+    }); 
+    res.shouldKeepAlive = false;;
+    res.write('You are not allowed to post data to this server\n');
+    res.end();
+    return;
+  }
+
   var matchId = req.params.id;
   var newMatchData = req.body.newMatchData;
 
   console.log('Received match details (%s) for match id (%s)', newMatchData, matchId);
-
+  
   matchData[matchId] = newMatchData;
 
   /**
@@ -58,7 +76,7 @@ app.post('/match/:id', function (req, res) {
   res.writeHead(200, {
     'Content-Type': 'text/plain'
   });
-  res.write('Received new match details ' + newMatchData + ' for match id ' + matchId);
+  res.write('Received new match details ' + newMatchData + ' for match id ' + matchId + '\n');
   res.end();
 });
 
@@ -69,6 +87,18 @@ webSocketServer.on('connection', function (webSocketClient) {
   consoleLogNewConnection(webSocketClient);
 
   var matchId = webSocketClient.upgradeReq.url.substring(1);
+
+  if (!matchId || !isNumber(matchId)) {
+    console.log('[CLOSED] Bad match id (%s) is requested, closing the socket connection', matchId);
+    webSocketClient.terminate();
+    return;
+  }
+
+  var currentMatchData = matchData[matchId];
+
+  if(!currentMatchData) {
+    console.log('Requested match (id: %s) does not exist, nevertheless adding the client to Match-Client map', matchId);
+  }
 
   var requestedMatchsCurrentClients = matchClients[matchId];
   if (!requestedMatchsCurrentClients) { // this is the first client requesting this match
@@ -82,8 +112,12 @@ webSocketServer.on('connection', function (webSocketClient) {
   consoleLogMatchClients();
 
   // send current match data to the new client
-  if (matchData[matchId]) {
-    webSocketClient.send(JSON.stringify('Curent match data: ' + matchData[matchId]), function () {});
+  if (currentMatchData) {
+    webSocketClient.send(JSON.stringify('Curent match data: ' + currentMatchData), function (error) {
+      if(error) {
+        console.error('Error when sending data to client on match ' + matchId + '. The error is: ' + error);
+      }
+    });
   }
 
   /**
@@ -93,6 +127,13 @@ webSocketServer.on('connection', function (webSocketClient) {
     // remove the client from matches he's watching
     removeClientFromMatchClients(this);
     consoleLogLeavingClientEvent();
+  });
+
+  /**
+   * Handle errors
+   */
+  webSocketClient.on('error', function (r) {
+    console.log('Client error: %s', e.message);
   });
 });
 
@@ -173,10 +214,11 @@ function removeFromArray(array, item) {
       }
     }
   } else {
-    console.error('Cant remove item ' + item + ' from array ' + array + '  because of type mismatch');
+    console.error('Cant remove item %s from array %s because of type mismatch', item, array);
   }
 }
 
-
-
+function isNumber(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
 
