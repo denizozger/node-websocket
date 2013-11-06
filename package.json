@@ -1,5 +1,6 @@
 {
-  "name": "node-ws-canary",
+  "name": "node-websocket-match",
+  "subdomain": "node-websocket-match",
   "version": "0.0.1",
   "repository": {
     "type": "git",
