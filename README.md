@@ -19,7 +19,7 @@ Pushing some match data to node server:
 curl -X POST --data "newMatchData={RefereeName: "Deniz"}" http://localhost:5000/match/1985
 ```
 
-Go to (localhost:5000/?1985) to see the most recent match data, and get updates when the node server receives/forwards 
+Go to [localhost:5000/?1985](localhost:5000/?1985) to see the most recent match data, and get updates when the node server receives/forwards 
   new data. Node server can receive data on any number of matches and clients can monitor those matches on different browser tabs.
 
 # Running on Heroku
