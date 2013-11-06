@@ -51,7 +51,7 @@ app.post('/match/:id', function (req, res) {
     res.writeHead(403, {
       'Content-Type': 'text/plain'
     }); 
-    res.shouldKeepAlive = false;;
+    res.shouldKeepAlive = false;
     res.write('You are not allowed to post data to this server\n');
     res.end();
     return;
@@ -132,8 +132,8 @@ webSocketServer.on('connection', function (webSocketClient) {
   /**
    * Handle errors
    */
-  webSocketClient.on('error', function (r) {
-    console.log('Client error: %s', e.message);
+  webSocketClient.on('error', function (e) {
+    console.error('Client error: %s', e.message);
   });
 });
 
