@@ -34,7 +34,9 @@ var matchData = {};
 var matchClients = {};
 
 /**
- * Receiving new match data and pushing it to clients who are connected to that match's stream
+ * Receiving new match data and pushing it to clients who are connected to that match's stream.
+ * This method processes a basic HTTP post with form data sumitted as JSON.
+ * Form data should contain match data.
  */
 app.post('/match/:id', function (req, res) {
   var matchId = req.params.id;
@@ -49,25 +51,19 @@ app.post('/match/:id', function (req, res) {
    */
   var clientsWatchingThisMatch = matchClients[matchId];
 
-  if (clientsWatchingThisMatch) {
-    for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
-      var watchingClient = clientsWatchingThisMatch[i];
-
-      watchingClient.send(JSON.stringify(newMatchData));
-    }
-  }
+  broadcastMessageToClientsWatchingThisMatch(clientsWatchingThisMatch, newMatchData);
 
   consoleLogMatch();
 
   res.writeHead(200, {
     'Content-Type': 'text/plain'
   });
-  res.write('Received new match details ' + newMatchData + ' for match id ' + newMatchData);
+  res.write('Received new match details ' + newMatchData + ' for match id ' + matchId);
   res.end();
 });
 
 /**
- * Handling clients requesting a specific match data
+ * Handling clients connections
  */
 webSocketServer.on('connection', function (webSocketClient) {
   consoleLogNewConnection(webSocketClient);
@@ -100,30 +96,57 @@ webSocketServer.on('connection', function (webSocketClient) {
   });
 });
 
-function removeClientFromMatchClients(leavingClient) {
-  for (var matchId in matchClients) {
-
-    var clientsWatchingThisMatch = matchClients[matchId];
-
+function broadcastMessageToClientsWatchingThisMatch(clientsWatchingThisMatch, newMatchData) {
+  if (clientsWatchingThisMatch && newMatchData) {
     for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
-      var client = clientsWatchingThisMatch[i]
+      var watchingClient = clientsWatchingThisMatch[i];
 
-      if (client === leavingClient) {
-        removeFromArray(clientsWatchingThisMatch, client);
-        console.log('Removed the leaving client from MatchClients object');
-
-        if (clientsWatchingThisMatch.length == 0) { // delete the match from MatchClients completely
-          delete matchClients[matchId];
-        }
-      }
+      if (_.isObject(watchingClient)) {
+        watchingClient.send(JSON.stringify(newMatchData));  
+      } else {
+        console.error('Cant send new match data to watching client');
+      }      
     }
   }
 }
 
+function removeClientFromMatchClients(leavingClient) {
+
+  if (_.isObject(leavingClient) && matchClients) {
+    for (var matchId in matchClients) {
+      
+      if(matchClients.hasOwnProperty(matchId)){
+        var clientsWatchingThisMatch = matchClients[matchId];
+
+        if (_.isArray(clientsWatchingThisMatch)) {
+          for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
+            var client = clientsWatchingThisMatch[i];
+
+            if (client && client === leavingClient) {
+              removeFromArray(clientsWatchingThisMatch, client);
+              console.log('Removed the leaving client from MatchClients object');
+
+              if (clientsWatchingThisMatch.length === 0) { // delete the match from MatchClients completely
+                delete matchClients[matchId];
+              }
+            }
+          }
+        }  
+      }
+    }
+  } else {
+    console.error('Leaving WebSocketClient is not passed as a parameter'); 
+  }
+}
+
 function consoleLogNewConnection(webSocketClient) {
-  console.log('[OPEN] WebSocket connection');
-  console.log('Requested match id: ' + webSocketClient.upgradeReq.url.substring(1));
-  console.log('WebSocket connections size: ' + webSocketServer.clients.length);
+  if (_.isObject(webSocketClient)) {
+    console.log('[OPEN] WebSocket connection');
+    console.log('Requested match id: ' + webSocketClient.upgradeReq.url.substring(1));
+    console.log('WebSocket connections size: ' + webSocketServer.clients.length);
+  } else {
+    console.error('New WebSocketClient is not passed as a parameter');
+  }
 }
 
 function consoleLogLeavingClientEvent() {
@@ -142,10 +165,18 @@ function consoleLogMatchClients() {
   console.log(matchClients);
 }
 
-function removeFromArray(arr, item) {
-  for (var i = arr.length; i--;) {
-    if (arr[i] === item) {
-      arr.splice(i, 1);
+function removeFromArray(array, item) {
+  if (_.isArray(array) && _.isObject(item)) {
+    for (var i = array.length; i--;) {
+      if (array[i] === item) {
+        array.splice(i, 1);
+      }
     }
+  } else {
+    console.error('Cant remove item ' + item + ' from array ' + array + '  because of type mismatch');
   }
 }
+
+
+
+
