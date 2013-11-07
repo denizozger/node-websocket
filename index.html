@@ -25,11 +25,15 @@
       var host = location.origin.replace(/^http/, 'ws');
       host = host + '/' + location.search.substring(1);
 
-      var ws = new WebSocket(host);
+      var ws;
+
+      (function() {
+          ws = new WebSocket(host);
+      })();
       
       ws.onmessage = function (event) {
         var li = document.createElement('li');
-        li.innerHTML = JSON.parse(event.data);
+        li.innerHTML = JSON.parse(event.data); // JSON parse is also very important for security
         document.querySelector('#events').appendChild(li);
       };
     </script>
