@@ -25,6 +25,7 @@ console.log('HTTP server listening on port %d', port);
 
 // Security settings, do not initialise it if you want to allow all IPs
 var allowedIPaddressesThatCanPushMatchData; 
+var applicationBaseUrl; // ie. 'http://localhost:5000'
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
@@ -85,6 +86,13 @@ app.post('/match/:id', function (req, res) {
  */
 webSocketServer.on('connection', function (webSocketClient) {
   consoleLogNewConnection(webSocketClient);
+
+  var origin = webSocketClient.upgradeReq.headers['origin'];
+
+  if (applicationBaseUrl && origin && origin !== applicationBaseUrl) {
+    console.log('[TERMINATED] WebSocket connection attempt from and unknown origin %s', origin);
+    return;
+  }
 
   var matchId = webSocketClient.upgradeReq.url.substring(1);
 
