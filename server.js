@@ -48,7 +48,7 @@ app.post('/match/:id', function (req, res) {
   var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
 
   if (allowedIPaddressesThatCanPushMatchData && _.indexOf(allowedIPaddressesThatCanPushMatchData, ip) === -1) {
-    console.log('Unknown server (%s) tried to post match data', ip);
+    console.warn('Unknown server (%s) tried to post match data', ip);
     res.writeHead(403, {
       'Content-Type': 'text/plain'
     }); 
@@ -90,14 +90,14 @@ webSocketServer.on('connection', function (webSocketClient) {
   var origin = webSocketClient.upgradeReq.headers['origin'];
 
   if (applicationBaseUrl && origin && origin !== applicationBaseUrl) {
-    console.log('[TERMINATED] WebSocket connection attempt from and unknown origin %s', origin);
+    console.warn('[TERMINATED] WebSocket connection attempt from and unknown origin %s', origin);
     return;
   }
 
   var matchId = webSocketClient.upgradeReq.url.substring(1);
 
   if (!matchId || !isNumber(matchId)) {
-    console.log('[CLOSED] Bad match id (%s) is requested, closing the socket connection', matchId);
+    console.warn('[CLOSED] Bad match id (%s) is requested, closing the socket connection', matchId);
     webSocketClient.terminate();
     return;
   }
