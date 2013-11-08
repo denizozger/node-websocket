@@ -2,6 +2,8 @@
 
 A small demo using the [einaros/ws](http://einaros.github.io/ws/) WebSockets implementation, built on [Heroku's template](https://github.com/heroku-examples/node-ws-test).
 
+Running on http://dry-wildwood-3323.herokuapp.com/ and http://node-websocket-match.jit.su/
+
 # Running Locally
 
 ``` bash
