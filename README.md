@@ -1,4 +1,4 @@
-# Node.js Websocket Demo
+# Node.js Websocket Demo [ ![Codeship Status for denizozger/node-websocket](https://www.codeship.io/projects/f23cd630-2d5e-0131-ef60-2e2c57662156/status?branch=master)](https://www.codeship.io/projects/9341)
 
 A small demo using the [einaros/ws](http://einaros.github.io/ws/) WebSockets implementation, built on [Heroku's template](https://github.com/heroku-examples/node-ws-test).
 
@@ -35,4 +35,4 @@ heroku open
 
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/denizozger/node-websocket/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
-
+ 
