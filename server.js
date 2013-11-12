@@ -6,6 +6,7 @@ var WebSocketServer = require('ws').Server,
   express = require('express'),
   _ = require('underscore'),
   app = express(),
+  request = require('request'),
   port = process.env.PORT || 5000;
 
 app.use(express.static(__dirname + '/'));
@@ -23,9 +24,10 @@ server.listen(port);
 
 console.log('HTTP server listening on port %d', port);
 
-// Security settings, do not initialise it if you want to allow all IPs
-var allowedIPaddressesThatCanPushMatchData; 
+// Infrastructure and security settings
+var allowedIPaddressesThatCanPushMatchData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
+var hubAddress = 'http://www.cjihrig.com/development/php/hello_form.php';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
@@ -105,7 +107,10 @@ webSocketServer.on('connection', function (webSocketClient) {
   var currentMatchData = matchData[matchId];
 
   if(!currentMatchData) {
-    console.log('Requested match (id: %s) does not exist, nevertheless adding the client to Match-Client map', matchId);
+    // We don't wait for this to complete before opening the connection
+    boardcastMatchRequestMessageToHubAsync(matchId, function(val){
+        boardcastMatchRequestMessageToHubSync(val);
+    });
   }
 
   var requestedMatchsCurrentClients = matchClients[matchId];
@@ -144,6 +149,32 @@ webSocketServer.on('connection', function (webSocketClient) {
     console.error('Client error: %s', e.message);
   });
 });
+
+function boardcastMatchRequestMessageToHubAsync(val, callback){
+  process.nextTick(function() {
+      callback(val);
+  });
+};
+
+function boardcastMatchRequestMessageToHubSync(matchId) {
+    console.log('Requested match (id: %s) does not exist, broadcasting a match request', matchId);
+
+    request({
+      uri: hubAddress,
+      method: 'POST',
+      form: {
+        matchId: matchId
+      }
+    }, function(error, response, body) {
+      if (!error && response.statusCode == 200) {
+        console.log('Successfully broadcasted match (id: %s) request message to %s, the response is %s', 
+          matchId, hubAddress, body); 
+      } else {
+        console.error('Can not broadcast match request message to Hub. Response: @s, Error: @s', 
+          response.statusCode, error);
+      }
+    });
+}
 
 function broadcastMessageToClientsWatchingThisMatch(clientsWatchingThisMatch, newMatchData) {
   if (clientsWatchingThisMatch && newMatchData) {
