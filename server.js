@@ -7,6 +7,7 @@ var WebSocketServer = require('ws').Server,
   _ = require('underscore'),
   app = express(),
   request = require('request'),
+  async = require('async'),
   port = process.env.PORT || 5000;
 
 app.use(express.static(__dirname + '/'));
@@ -72,7 +73,7 @@ app.post('/match/:id', function (req, res) {
    */
   var clientsWatchingThisMatch = matchClients[matchId];
 
-  broadcastMessageToClientsWatchingThisMatch(clientsWatchingThisMatch, newMatchData);
+  broadcastMessageToClientsWatchingThisMatchAsync(clientsWatchingThisMatch, newMatchData);
 
   consoleLogMatch();
 
@@ -151,9 +152,12 @@ webSocketServer.on('connection', function (webSocketClient) {
 });
 
 function boardcastMatchRequestMessageToHubAsync(val, callback){
-  process.nextTick(function() {
-      callback(val);
-  });
+  if (val) {
+    process.nextTick(function() {
+        callback(val);
+        return;
+    });  
+  }
 };
 
 function boardcastMatchRequestMessageToHubSync(matchId) {
@@ -170,28 +174,27 @@ function boardcastMatchRequestMessageToHubSync(matchId) {
         console.log('Successfully broadcasted match (id: %s) request message to %s, the response is %s', 
           matchId, hubAddress, body); 
       } else {
-        console.error('Can not broadcast match request message to Hub. Response: @s, Error: @s', 
-          response.statusCode, error);
+        console.error('Can not broadcast match request message to Hub: %s', error);
       }
     });
 }
 
-function broadcastMessageToClientsWatchingThisMatch(clientsWatchingThisMatch, newMatchData) {
+function broadcastMessageToClientsWatchingThisMatchAsync(clientsWatchingThisMatch, newMatchData) {
   if (clientsWatchingThisMatch && newMatchData) {
-    for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
-      var watchingClient = clientsWatchingThisMatch[i];
-
-      if (_.isObject(watchingClient)) {
-        watchingClient.send(JSON.stringify(newMatchData));  
-      } else {
-        console.error('Cant send new match data to watching client');
-      }      
-    }
+    async.forEach(clientsWatchingThisMatch, function(watchingClient){
+        if (_.isObject(watchingClient)) {
+          watchingClient.send(JSON.stringify(newMatchData));  
+        } else {
+          console.error('Cant send new match data to watching client - watching client is not an object');
+        }   
+    },
+    function(err){
+      console.error('Cant broadcast match data to watching client:', err)  
+    });
   }
 }
 
 function removeClientFromMatchClients(leavingClient) {
-
   if (_.isObject(leavingClient) && matchClients) {
     for (var matchId in matchClients) {
       
