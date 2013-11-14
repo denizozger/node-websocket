@@ -28,6 +28,7 @@ console.log('HTTP server listening on port %d', port);
 // Infrastructure and security settings
 var allowedIPaddressesThatCanPushMatchData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
+// var fetcherAddress = 'http://obscure-crag-1354.herokuapp.com/fetchlist/new/';
 var fetcherAddress = 'http://5c31e3dd.ngrok.com/fetchlist/new/';
 
 // Initiate the server
