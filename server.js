@@ -28,7 +28,7 @@ console.log('HTTP server listening on port %d', port);
 // Infrastructure and security settings
 var allowedIPaddressesThatCanPushMatchData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
-var hubAddress = 'http://www.cjihrig.com/development/php/hello_form.php';
+var fetcherAddress = 'http://5c31e3dd.ngrok.com/fetchlist/new/';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
@@ -47,7 +47,7 @@ var matchClients = {};
  * This method processes a basic HTTP post with form data sumitted as JSON.
  * Form data should contain match data.
  */
-app.post('/match/:id', function (req, res) {
+app.post('/broadcast/:id', function (req, res) {
   var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
 
   if (allowedIPaddressesThatCanPushMatchData && _.indexOf(allowedIPaddressesThatCanPushMatchData, ip) === -1) {
@@ -109,8 +109,8 @@ webSocketServer.on('connection', function (webSocketClient) {
 
   if(!currentMatchData) {
     // We don't wait for this to complete before opening the connection
-    boardcastMatchRequestMessageToHubAsync(matchId, function(val){
-        boardcastMatchRequestMessageToHubSync(val);
+    boardcastMatchRequestMessageToFetcherAsync(matchId, function(val){
+        boardcastMatchRequestMessageToFetcherSync(val);
     });
   }
 
@@ -151,7 +151,7 @@ webSocketServer.on('connection', function (webSocketClient) {
   });
 });
 
-function boardcastMatchRequestMessageToHubAsync(val, callback){
+function boardcastMatchRequestMessageToFetcherAsync(val, callback){
   if (val) {
     process.nextTick(function() {
         callback(val);
@@ -160,21 +160,21 @@ function boardcastMatchRequestMessageToHubAsync(val, callback){
   }
 };
 
-function boardcastMatchRequestMessageToHubSync(matchId) {
+function boardcastMatchRequestMessageToFetcherSync(matchId) {
     console.log('Requested match (id: %s) does not exist, broadcasting a match request', matchId);
 
     request({
-      uri: hubAddress,
-      method: 'POST',
+      uri: fetcherAddress + matchId,
+      method: 'GET',
       form: {
         matchId: matchId
       }
     }, function(error, response, body) {
       if (!error && response.statusCode == 200) {
         console.log('Successfully broadcasted match (id: %s) request message to %s, the response is %s', 
-          matchId, hubAddress, body); 
+          matchId, fetcherAddress, body); 
       } else {
-        console.error('Can not broadcast match request message to Hub: %s', error);
+        console.error('Can not broadcast match request message to Fetcher (): %s', fetcherAddress + matchId, error);
       }
     });
 }
