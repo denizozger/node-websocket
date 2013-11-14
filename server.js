@@ -18,7 +18,8 @@ app.use(function (err, req, res, next) {
   res.send(500, 'Something broke!');
 });
 
-app.use(express.bodyParser());
+app.use(express.json());
+app.use(express.urlencoded());
 
 var server = http.createServer(app);
 server.listen(port);
@@ -26,33 +27,38 @@ server.listen(port);
 console.log('HTTP server listening on port %d', port);
 
 // Infrastructure and security settings
-var allowedIPaddressesThatCanPushMatchData;  // Do not initialise it if you want to allow all IPs
+var allowedIPaddressesThatCanPushResourceData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
 // var fetcherAddress = 'http://obscure-crag-1354.herokuapp.com/fetchlist/new/';
-var fetcherAddress = 'http://5c31e3dd.ngrok.com/fetchlist/new/';
+var fetcherAddress = process.env.FETCHER_ADDRESS || 'http://5c31e3dd.ngrok.com/fetchlist/new/';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
   server: server
 });
-console.log('WebSocket server created, allowing incoming match data from ' + JSON.stringify(allowedIPaddressesThatCanPushMatchData));
+
+if (allowedIPaddressesThatCanPushResourceData) {
+  console.log('WebSocket server created, allowing incoming resource data from ' + JSON.stringify(allowedIPaddressesThatCanPushResourceData));
+} else {
+  console.log('WebSocket server created, allowing incoming resource data from all');
+}
 
 /**
- * Data models that hold match -> matchdata, and match -> clients data
+ * Data models that hold resource -> resourcedata, and resource -> clients data
  */
-var matchData = {};
-var matchClients = {};
+var resourceData = {};
+var resourceClients = {};
 
 /**
- * Receiving new match data and pushing it to clients who are connected to that match's stream.
+ * Receiving new resource data and pushing it to clients who are connected to that resource's stream.
  * This method processes a basic HTTP post with form data sumitted as JSON.
- * Form data should contain match data.
+ * Form data should contain resource data.
  */
-app.post('/broadcast/:id', function (req, res) {
+app.post('/broadcast/?*', function (req, res) {
   var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
 
-  if (allowedIPaddressesThatCanPushMatchData && _.indexOf(allowedIPaddressesThatCanPushMatchData, ip) === -1) {
-    console.warn('Unknown server (%s) tried to post match data', ip);
+  if (allowedIPaddressesThatCanPushResourceData && _.indexOf(allowedIPaddressesThatCanPushResourceData, ip) === -1) {
+    console.warn('Unknown server (%s) tried to post resource data', ip);
     res.writeHead(403, {
       'Content-Type': 'text/plain'
     }); 
@@ -62,26 +68,26 @@ app.post('/broadcast/:id', function (req, res) {
     return;
   }
 
-  var matchId = req.params.id;
-  var newMatchData = req.body.newMatchData;
+  var resourceId = req.params[0];
+  var newResourceData = req.body.newResourceData;
 
-  console.log('Received match details (%s) for match id (%s)', newMatchData, matchId);
+  console.log('Received resource details (%s) for resource id (%s)', newResourceData, resourceId);
   
-  matchData[matchId] = newMatchData;
+  resourceData[resourceId] = newResourceData;
 
   /**
-   * Braodcast the new match data to clients watching it
+   * Braodcast the new resource data to clients watching it
    */
-  var clientsWatchingThisMatch = matchClients[matchId];
+  var clientsWatchingThisResource = resourceClients[resourceId];
 
-  broadcastMessageToClientsWatchingThisMatchAsync(clientsWatchingThisMatch, newMatchData);
+  broadcastMessageToClientsWatchingThisResourceAsync(clientsWatchingThisResource, newResourceData);
 
-  consoleLogMatch();
+  consoleLogResource();
 
   res.writeHead(200, {
     'Content-Type': 'text/plain'
   });
-  res.write('Received new match details ' + newMatchData + ' for match id ' + matchId + '\n');
+  res.write('Received new resource details ' + newResourceData + ' for resource id ' + resourceId + '\n');
   res.end();
 });
 
@@ -98,39 +104,39 @@ webSocketServer.on('connection', function (webSocketClient) {
     return;
   }
 
-  var matchId = webSocketClient.upgradeReq.url.substring(1);
+  var resourceId = webSocketClient.upgradeReq.url.substring(1);
 
-  if (!matchId || !isNumber(matchId)) {
-    console.warn('[CLOSED] Bad match id (%s) is requested, closing the socket connection', matchId);
+  if (!resourceId) {
+    console.warn('[CLOSED] Bad resource id (%s) is requested, closing the socket connection', resourceId);
     webSocketClient.terminate();
     return;
   }
 
-  var currentMatchData = matchData[matchId];
+  var currentResourceData = resourceData[resourceId];
 
-  if(!currentMatchData) {
+  if(!currentResourceData) {
     // We don't wait for this to complete before opening the connection
-    boardcastMatchRequestMessageToFetcherAsync(matchId, function(val){
-        boardcastMatchRequestMessageToFetcherSync(val);
+    boardcastResourceRequestMessageToFetcherAsync(resourceId, function(val){
+        boardcastResourceRequestMessageToFetcherSync(val);
     });
   }
 
-  var requestedMatchsCurrentClients = matchClients[matchId];
-  if (!requestedMatchsCurrentClients) { // this is the first client requesting this match
-    requestedMatchsCurrentClients = [];
+  var requestedResourcesCurrentClients = resourceClients[resourceId];
+  if (!requestedResourcesCurrentClients) { // this is the first client requesting this resource
+    requestedResourcesCurrentClients = [];
   }
 
   // add the new client to current clients
-  requestedMatchsCurrentClients.push(webSocketClient);
-  matchClients[matchId] = requestedMatchsCurrentClients;
+  requestedResourcesCurrentClients.push(webSocketClient);
+  resourceClients[resourceId] = requestedResourcesCurrentClients;
 
-  consoleLogMatchClients();
+  consoleLogResourceClients();
 
-  // send current match data to the new client
-  if (currentMatchData) {
-    webSocketClient.send(JSON.stringify('Curent match data: ' + currentMatchData), function (error) {
+  // send current resource data to the new client
+  if (currentResourceData) {
+    webSocketClient.send(JSON.stringify('Curent resource data: ' + currentResourceData), function (error) {
       if(error) {
-        console.error('Error when sending data to client on match ' + matchId + '. The error is: ' + error);
+        console.error('Error when sending data to client on resource ' + resourceId + '. The error is: ' + error);
       }
     });
   }
@@ -139,8 +145,8 @@ webSocketServer.on('connection', function (webSocketClient) {
    * Handle leaving clients
    */
   webSocketClient.on('close', function () {
-    // remove the client from matches he's watching
-    removeClientFromMatchClients(this);
+    // remove the client from resourcees he's watching
+    removeClientFromResourceClients(this);
     consoleLogLeavingClientEvent();
   });
 
@@ -152,7 +158,7 @@ webSocketServer.on('connection', function (webSocketClient) {
   });
 });
 
-function boardcastMatchRequestMessageToFetcherAsync(val, callback){
+function boardcastResourceRequestMessageToFetcherAsync(val, callback){
   if (val) {
     process.nextTick(function() {
         callback(val);
@@ -161,57 +167,60 @@ function boardcastMatchRequestMessageToFetcherAsync(val, callback){
   }
 };
 
-function boardcastMatchRequestMessageToFetcherSync(matchId) {
-    console.log('Requested match (id: %s) does not exist, broadcasting a match request', matchId);
+function boardcastResourceRequestMessageToFetcherSync(resourceId) {
+    console.log('Requested resource (id: %s) does not exist, broadcasting a resource request', resourceId);
 
     request({
-      uri: fetcherAddress + matchId,
+      uri: fetcherAddress + resourceId,
       method: 'GET',
       form: {
-        matchId: matchId
+        resourceId: resourceId
       }
     }, function(error, response, body) {
       if (!error && response.statusCode == 200) {
-        console.log('Successfully broadcasted match (id: %s) request message to %s, the response is %s', 
-          matchId, fetcherAddress, body); 
+        console.log('Successfully broadcasted resource (id: %s) request message to %s, the response is %s', 
+          resourceId, fetcherAddress, body); 
       } else {
-        console.error('Can not broadcast match request message to Fetcher (): %s', fetcherAddress + matchId, error);
+        console.error('Can not broadcast resource request message to Fetcher (): %s', fetcherAddress + resourceId, error);
       }
     });
 }
 
-function broadcastMessageToClientsWatchingThisMatchAsync(clientsWatchingThisMatch, newMatchData) {
-  if (clientsWatchingThisMatch && newMatchData) {
-    async.forEach(clientsWatchingThisMatch, function(watchingClient){
+function broadcastMessageToClientsWatchingThisResourceAsync(clientsWatchingThisResource, newResourceData) {
+  if (clientsWatchingThisResource && newResourceData) {
+    async.forEach(clientsWatchingThisResource, function(watchingClient){
         if (_.isObject(watchingClient)) {
-          watchingClient.send(JSON.stringify(newMatchData));  
+          watchingClient.send(JSON.stringify(newResourceData));  
         } else {
-          console.error('Cant send new match data to watching client - watching client is not an object');
+          console.error('Cant send new resource data to watching client - watching client is not an object');
         }   
     },
     function(err){
-      console.error('Cant broadcast match data to watching client:', err)  
+      console.error('Cant broadcast resource data to watching client:', err)  
     });
+  } else {
+    console.error('No clients watching this resource (%s) or no new resource data (%s)', 
+      clientsWatchingThisResource, newResourceData);
   }
 }
 
-function removeClientFromMatchClients(leavingClient) {
-  if (_.isObject(leavingClient) && matchClients) {
-    for (var matchId in matchClients) {
+function removeClientFromResourceClients(leavingClient) {
+  if (_.isObject(leavingClient) && resourceClients) {
+    for (var resourceId in resourceClients) {
       
-      if(matchClients.hasOwnProperty(matchId)){
-        var clientsWatchingThisMatch = matchClients[matchId];
+      if(resourceClients.hasOwnProperty(resourceId)){
+        var clientsWatchingThisResource = resourceClients[resourceId];
 
-        if (_.isArray(clientsWatchingThisMatch)) {
-          for (var i = 0; i < clientsWatchingThisMatch.length; i++) {
-            var client = clientsWatchingThisMatch[i];
+        if (_.isArray(clientsWatchingThisResource)) {
+          for (var i = 0; i < clientsWatchingThisResource.length; i++) {
+            var client = clientsWatchingThisResource[i];
 
             if (client && client === leavingClient) {
-              removeFromArray(clientsWatchingThisMatch, client);
-              console.log('Removed the leaving client from MatchClients object');
+              removeFromArray(clientsWatchingThisResource, client);
+              console.log('Removed the leaving client from ResourceClients object');
 
-              if (clientsWatchingThisMatch.length === 0) { // delete the match from MatchClients completely
-                delete matchClients[matchId];
+              if (clientsWatchingThisResource.length === 0) { // delete the resource from ResourceClients completely
+                delete resourceClients[resourceId];
               }
             }
           }
@@ -226,7 +235,7 @@ function removeClientFromMatchClients(leavingClient) {
 function consoleLogNewConnection(webSocketClient) {
   if (_.isObject(webSocketClient)) {
     console.log('[OPEN] WebSocket connection');
-    console.log('Requested match id: ' + webSocketClient.upgradeReq.url.substring(1));
+    console.log('Requested resource id: ' + webSocketClient.upgradeReq.url.substring(1));
     console.log('WebSocket connections size: ' + webSocketServer.clients.length);
   } else {
     console.error('New WebSocketClient is not passed as a parameter');
@@ -236,17 +245,17 @@ function consoleLogNewConnection(webSocketClient) {
 function consoleLogLeavingClientEvent() {
   console.log('[CLOSED] WebSocket connection');
   console.log('WebSocket connections size: ' + webSocketServer.clients.length);
-  consoleLogMatchClients();
+  consoleLogResourceClients();
 }
 
-function consoleLogMatch() {
-  console.log('Current Match object:');
-  console.log(JSON.stringify(matchData, null, 4));
+function consoleLogResource() {
+  console.log('Current Resource object:');
+  console.log(JSON.stringify(resourceData, null, 4));
 }
 
-function consoleLogMatchClients() {
-  console.log('Current Match clients:');
-  console.log(matchClients);
+function consoleLogResourceClients() {
+  console.log('Current Resource clients:');
+  console.log(resourceClients);
 }
 
 function removeFromArray(array, item) {
@@ -257,11 +266,6 @@ function removeFromArray(array, item) {
       }
     }
   } else {
-    console.error('Cant remove item %s from array %s because of type mismatch', item, array);
+    console.error('Cant remove item %s from array %s because of type misresource', item, array);
   }
 }
-
-function isNumber(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-
