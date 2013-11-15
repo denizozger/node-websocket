@@ -15,7 +15,7 @@ app.enable('trust proxy');
 
 app.use(function (err, req, res, next) {
   console.error(err.stack);
-  res.send(500, 'Something broke!');
+  res.send(500, 'Internal server error');
 });
 
 app.use(express.json());
@@ -38,7 +38,8 @@ var webSocketServer = new WebSocketServer({
 });
 
 if (allowedIPaddressesThatCanPushResourceData) {
-  console.log('WebSocket server created, allowing incoming resource data from ' + JSON.stringify(allowedIPaddressesThatCanPushResourceData));
+  console.log('WebSocket server created, allowing incoming resource data from ' + 
+    JSON.stringify(allowedIPaddressesThatCanPushResourceData));
 } else {
   console.log('WebSocket server created, allowing incoming resource data from all');
 }
@@ -114,6 +115,8 @@ webSocketServer.on('connection', function (webSocketClient) {
 
   var currentResourceData = resourceData[resourceId];
 
+  console.log('DDDDDD' + currentResourceData);
+
   if(!currentResourceData) {
     // We don't wait for this to complete before opening the connection
     boardcastResourceRequestMessageToFetcherAsync(resourceId, function(val){
@@ -145,7 +148,7 @@ webSocketServer.on('connection', function (webSocketClient) {
    * Handle leaving clients
    */
   webSocketClient.on('close', function () {
-    // remove the client from resourcees he's watching
+    // remove the client from resources he's watching
     removeClientFromResourceClients(this);
     consoleLogLeavingClientEvent();
   });
@@ -219,9 +222,12 @@ function removeClientFromResourceClients(leavingClient) {
               removeFromArray(clientsWatchingThisResource, client);
               console.log('Removed the leaving client from ResourceClients object');
 
-              if (clientsWatchingThisResource.length === 0) { // delete the resource from ResourceClients completely
+              // If this was the last client watching this resource, remove the resource from ResourceClients and ResourceData
+              if (clientsWatchingThisResource.length === 0) { 
+                console.log('This was the last client watching this resource, removing the resource from memory');
                 delete resourceClients[resourceId];
-              }
+                delete resourceData[resourceId];
+              } 
             }
           }
         }  
