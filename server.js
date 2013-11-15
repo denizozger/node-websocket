@@ -29,7 +29,7 @@ console.log('HTTP server listening on port %d', port);
 // Infrastructure and security settings
 var allowedIPaddressesThatCanPushResourceData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
-const fetcherAddress = process.env.FETCHER_ADDRESS || 'http://obscure-crag-1354.herokuapp.com/fetchlist/new/';
+const fetcherAddress = process.env.FETCHER_ADDRESS || 'http://node-fetcher.herokuapp.com/fetchlist/new/';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
@@ -156,6 +156,13 @@ webSocketServer.on('connection', function (webSocketClient) {
   webSocketClient.on('error', function (e) {
     console.error('Client error: %s', e.message);
   });
+});
+
+app.get('/', function(req, res){
+  var body = 'node-websocket';
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Content-Length', body.length);
+  res.end(body);
 });
 
 function boardcastResourceRequestMessageToFetcherAsync(val, callback){
