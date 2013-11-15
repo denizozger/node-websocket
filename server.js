@@ -27,21 +27,15 @@ server.listen(port);
 console.log('HTTP server listening on port %d', port);
 
 // Infrastructure and security settings
-var allowedIPaddressesThatCanPushResourceData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
 const fetcherAddress = process.env.FETCHER_ADDRESS || 'http://node-fetcher.herokuapp.com/fetchlist/new/';
+const authorizationHeaderKey = 'bm9kZS1mZXRjaGVy';
+const nodeFetcherAuthorizationHeaderKey = 'bm9kZS13ZWJzb2NrZXQ=';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
   server: server
 });
-
-if (allowedIPaddressesThatCanPushResourceData) {
-  console.log('WebSocket server created, allowing incoming resource data from ' + 
-    JSON.stringify(allowedIPaddressesThatCanPushResourceData));
-} else {
-  console.log('WebSocket server created, allowing incoming resource data from all');
-}
 
 /**
  * Data models that hold resource -> resourcedata, and resource -> clients data
@@ -55,15 +49,18 @@ var resourceClients = {};
  * Form data should contain resource data.
  */
 app.post('/broadcast/?*', function (req, res) {
-  var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
 
-  if (allowedIPaddressesThatCanPushResourceData && _.indexOf(allowedIPaddressesThatCanPushResourceData, ip) === -1) {
+  // Security
+  if (req.header('Authorization') !== authorizationHeaderKey) {
+    var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
+
     console.warn('Unknown server (%s) tried to post resource data', ip);
+
     res.writeHead(403, {
       'Content-Type': 'text/plain'
     }); 
     res.shouldKeepAlive = false;
-    res.write('You are not allowed to post data to this server\n');
+    res.write('You are not allowed to get data from this server\n');
     res.end();
     return;
   }
@@ -175,6 +172,9 @@ function boardcastResourceRequestMessageToFetcherSync(resourceId) {
       method: 'GET',
       form: {
         resourceId: resourceId
+      },
+      headers: {
+        Authorization: nodeFetcherAuthorizationHeaderKey
       }
     }, function(error, response, body) {
       if (!error && response.statusCode == 200) {

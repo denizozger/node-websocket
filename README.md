@@ -25,7 +25,7 @@ Please see [node-fetcher](https://github.com/denizozger/node-fetcher) and [node-
 
 Pushing some match data to node server (for the server to transmit data to connected clients via Web Sockets):
 ``` bash
-curl -X POST --data "newResourceData={id: 2, data: "Lorem", version: 5}" http://localhost:5000/broadcast/some-key
+curl -X POST --data "newResourceData={id: 2, data: "Lorem", version: 5}" http://localhost:5000/broadcast/some-key -H "Authorization:bm9kZS13ZWJzb2NrZXQ="
 ```
 
 Go to [localhost:5000/?some-key](localhost:5000/?some-key) to see the most recent data, and get updates when the node server receives/forwards 
