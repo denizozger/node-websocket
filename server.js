@@ -94,7 +94,7 @@ app.post('/broadcast/?*', function (req, res) {
 webSocketServer.on('connection', function (webSocketClient) {
   consoleLogNewConnection(webSocketClient);
 
-  var origin = webSocketClient.upgradeReq.headers['origin'];
+  var origin = webSocketClient.upgradeReq.headers.origin;
 
   if (applicationBaseUrl && origin && origin !== applicationBaseUrl) {
     console.warn('[TERMINATED] WebSocket connection attempt from and unknown origin %s', origin);
@@ -162,7 +162,7 @@ function boardcastResourceRequestMessageToFetcherAsync(val, callback){
         return;
     });  
   }
-};
+}
 
 function boardcastResourceRequestMessageToFetcherSync(resourceId) {
     console.log('Requested resource (id: %s) does not exist, broadcasting a resource request', resourceId);
@@ -196,7 +196,7 @@ function broadcastMessageToClientsWatchingThisResourceAsync(clientsWatchingThisR
         }   
     },
     function(err){
-      console.error('Cant broadcast resource data to watching client:', err)  
+      console.error('Cant broadcast resource data to watching client:', err);  
     });
   } else {
     console.error('No clients watching this resource (%s) or no new resource data (%s)', 
