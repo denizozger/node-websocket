@@ -1,4 +1,4 @@
-# Node.js Websocket Demo [ ![Codeship Status for denizozger/node-websocket](https://www.codeship.io/projects/f23cd630-2d5e-0131-ef60-2e2c57662156/status?branch=master)](https://www.codeship.io/projects/9341)
+# Node.js Websocket Server [ ![Codeship Status for denizozger/node-websocket](https://www.codeship.io/projects/f23cd630-2d5e-0131-ef60-2e2c57662156/status?branch=master)](https://www.codeship.io/projects/9341)
 
 This node application perioducally receives JSON data from another web application, and serves it to clients connected to it.
 
