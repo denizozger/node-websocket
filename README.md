@@ -1,6 +1,6 @@
 # Node.js Websocket Server [ ![Codeship Status for denizozger/node-websocket](https://www.codeship.io/projects/f23cd630-2d5e-0131-ef60-2e2c57662156/status?branch=master)](https://www.codeship.io/projects/9341)
 
-This node application perioducally receives JSON data from another web application, and serves it to clients connected to it.
+This Node application perioducally receives JSON data from another web application, and serves it to clients connected to it.
 
 Uses the [einaros/ws](http://einaros.github.io/ws/) WebSockets implementation, and is built on [Heroku's template](https://github.com/heroku-examples/node-ws-test).
 
@@ -30,6 +30,12 @@ curl -X POST --data "newResourceData={id: 2, data: "Lorem", version: 5}" http://
 
 Go to [localhost:5000/?some-key](localhost:5000/?some-key) to see the most recent data, and get updates when the node server receives/forwards 
   new data. Node server can receive data on any number of keys and clients can monitor those keys on different browser tabs.
+  
+If you setup the other three projects, you should start node-fetcher as:
+
+``` bash
+PORT=5000 FETCHER_ADDRESS='http://localhost:4000/fetchlist/new/' foreman start
+```
 
 # Running on Heroku
 
