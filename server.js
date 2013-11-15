@@ -29,8 +29,7 @@ console.log('HTTP server listening on port %d', port);
 // Infrastructure and security settings
 var allowedIPaddressesThatCanPushResourceData;  // Do not initialise it if you want to allow all IPs
 var applicationBaseUrl; // ie. 'http://localhost:5000'
-// var fetcherAddress = 'http://obscure-crag-1354.herokuapp.com/fetchlist/new/';
-var fetcherAddress = process.env.FETCHER_ADDRESS || 'http://5c31e3dd.ngrok.com/fetchlist/new/';
+const fetcherAddress = process.env.FETCHER_ADDRESS || 'http://obscure-crag-1354.herokuapp.com/fetchlist/new/';
 
 // Initiate the server
 var webSocketServer = new WebSocketServer({
@@ -114,8 +113,6 @@ webSocketServer.on('connection', function (webSocketClient) {
   }
 
   var currentResourceData = resourceData[resourceId];
-
-  console.log('DDDDDD' + currentResourceData);
 
   if(!currentResourceData) {
     // We don't wait for this to complete before opening the connection
