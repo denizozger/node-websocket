@@ -6,7 +6,7 @@ Uses the [einaros/ws](http://einaros.github.io/ws/) WebSockets implementation, a
 
 # See it in action
 
-Go to [node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre](node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre). 
+Go to [http://node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre](http://node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre). 
 
 # Running Locally
 
