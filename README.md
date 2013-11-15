@@ -4,6 +4,10 @@ This Node application perioducally receives JSON data from another web applicati
 
 Uses the [einaros/ws](http://einaros.github.io/ws/) WebSockets implementation, and is built on [Heroku's template](https://github.com/heroku-examples/node-ws-test).
 
+# See it in action
+
+Go to [node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre](node-websocket-server.herokuapp.com/?matchesfeed/8/matchcentre). 
+
 # Running Locally
 
 ``` bash
