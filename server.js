@@ -158,13 +158,6 @@ webSocketServer.on('connection', function (webSocketClient) {
   });
 });
 
-app.get('/', function(req, res){
-  var body = 'node-websocket';
-  res.setHeader('Content-Type', 'text/plain');
-  res.setHeader('Content-Length', body.length);
-  res.end(body);
-});
-
 function boardcastResourceRequestMessageToFetcherAsync(val, callback){
   if (val) {
     process.nextTick(function() {
