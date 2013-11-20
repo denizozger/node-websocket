@@ -30,28 +30,17 @@ var webSocketServer = new WebSocketServer({
   server: server
 });
 
-
 // Infrastructure and security settings
 var applicationBaseUrl; // ie. 'http://localhost:5000'
 const fetcherAddress = process.env.FETCHER_ADDRESS || 'http://node-fetcher.herokuapp.com/fetchlist/new/';
 const authorizationHeaderKey = 'bm9kZS1mZXRjaGVy';
 const nodeFetcherAuthorizationHeaderKey = 'bm9kZS13ZWJzb2NrZXQ=';
 
-
 /**
  * Data models that hold resource -> resourcedata, and resource -> observers data
  */
 var resourceData = {};
 var resourceObservers = {};
-
-function checkApplicationBaseURLIfNedded(origin) {
-  if (applicationBaseUrl && origin && origin !== applicationBaseUrl) {
-    console.warn('[TERMINATED] WebSocket connection attempt from and unknown origin %s', origin);
-    return false;
-  }
-
-  return true;
-}
 
 /**
  * Public Endpoints
@@ -85,67 +74,36 @@ app.post('/broadcast/?*', function (req, res) {
 });
 
 /**
- * Receiving new resource data and pushing it to observers who are connected to that resource's stream.
- * This method processes a basic HTTP post with form data sumitted as JSON.
- * Form data should contain resource data.
- */
-function handleReceivedResourceData(resourceId, newResourceData) {
-  console.log('Received resource details (%s) for resource id (%s)', newResourceData, resourceId);
-  
-  // store new data
-  resourceData[resourceId] = newResourceData;
-
-  // 
-  var observersWatchingThisResource = resourceObservers[resourceId];
-  broadcastMessageToObserversWatchingThisResourceAsync(observersWatchingThisResource, newResourceData);
-
-  consoleLogResource();
-}  
-
-/**
  *  Internal business logic implementation
  */
-
-function isThisHTTPRequestAllowedToPostData(req) {
-  if (req.header('Authorization') !== authorizationHeaderKey) {
-    var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
-
-    console.warn('Unknown server (%s) tried to post resource data', ip);
-    return false;
-  }
-  return true;
-}
 
 function handleNewClientConnection(webSocketClient) {
   consoleLogNewConnection(webSocketClient);
 
   var origin = webSocketClient.upgradeReq.headers.origin;
-  console.log(origin);
-
-  if (!checkApplicationBaseURLIfNedded(origin)) {
-    return;
-  }
-
   var resourceId = webSocketClient.upgradeReq.url.substring(1);
-  if (!resourceId) {
-    console.warn('[CLOSED] Bad resource id (%s) is requested, closing the socket connection', resourceId);
+
+  if (!isValidConnection) {
     webSocketClient.terminate();
     return;
   }
 
-  // Handle leaving observers
-  webSocketClient.on('close', function () {
-    // remove the observer from resources he's watching
-    removeObserverFromResourceObservers(this);
-    consoleLogLeavingObserverEvent();
-  });
+  addClientAsAnObserverToThisResource(resourceId, webSocketClient);
 
-  // Handle errors
-  webSocketClient.on('error', function (e) {
-    console.error('Client error: %s', e.message);
-  });
+  var existingResourceData = resourceData[resourceId];
 
+  if (existingResourceData) {
+    sendResourceDataToObserver(webSocketClient);
+  } else {
+    requestResourceFromFetcherAsync(resourceId, function(val){
+        requestResourceFromFetcherSync(val);
+    });
+  }
+}
+
+function addClientAsAnObserverToThisResource(resourceId, webSocketClient) {
   var requestedResourcesCurrentObservers = resourceObservers[resourceId];
+
   if (!requestedResourcesCurrentObservers) { // this is the first observer requesting this resource
     requestedResourcesCurrentObservers = [];
   }
@@ -155,22 +113,18 @@ function handleNewClientConnection(webSocketClient) {
   resourceObservers[resourceId] = requestedResourcesCurrentObservers;
   consoleLogResourceObservers();
 
-  var currentResourceData = resourceData[resourceId];
-  if (!currentResourceData) {
-    // We don't wait for this to complete before opening the connection
-    boardcastResourceRequestMessageToFetcherAsync(resourceId, function(val){
-        boardcastResourceRequestMessageToFetcherSync(val);
-    });
-  } else {
-    webSocketClient.send(JSON.stringify('Curent resource data: ' + currentResourceData), function (error) {
-      if(error) {
-        console.error('Error when sending data to observer on resource ' + resourceId + '. The error is: ' + error);
-      }
-    });
-  }
+  // Actions to take when client leaves
+  webSocketClient.on('close', function () {
+    removeObserverFromResourceObservers(this);
+    consoleLogLeavingObserverEvent();
+  });
+
+  webSocketClient.on('error', function (e) {
+    console.error('Client error: %s', e.message);
+  });
 }
 
-function boardcastResourceRequestMessageToFetcherAsync(val, callback){
+function requestResourceFromFetcherAsync(val, callback){
   if (val) {
     process.nextTick(function() {
         callback(val);
@@ -179,7 +133,7 @@ function boardcastResourceRequestMessageToFetcherAsync(val, callback){
   }
 }
 
-function boardcastResourceRequestMessageToFetcherSync(resourceId) {
+function requestResourceFromFetcherSync(resourceId) {
     console.log('Requested resource (id: %s) does not exist, broadcasting a resource request', resourceId);
 
     request({
@@ -193,13 +147,39 @@ function boardcastResourceRequestMessageToFetcherSync(resourceId) {
       }
     }, function(error, response, body) {
       if (!error && response.statusCode == 200) {
-        console.log('Successfully broadcasted resource (id: %s) request message to %s, the response is %s', 
+        console.log('Successfully requested resource (id: %s) from %s, the response is %s', 
           resourceId, fetcherAddress, body); 
       } else {
-        console.error('Can not broadcast resource request message to Fetcher (): %s', fetcherAddress + resourceId, error);
+        console.error('Can not request resource from Fetcher (%s):', fetcherAddress + resourceId, error);
       }
     });
 }
+
+function sendResourceDataToObserver(webSocketClient) {
+  webSocketClient.send(JSON.stringify('Curent resource data: ' + existingResourceData), function (error) {
+    if(error) {
+      console.error('Error when sending data to observer on resource ' + resourceId + '. The error is: ' + error);
+    }
+  }); 
+}
+
+/**
+ * Receiving new resource data and pushing it to observers who are connected to that resource's stream.
+ * This method processes a basic HTTP post with form data sumitted as JSON.
+ * Form data should contain resource data.
+ */
+function handleReceivedResourceData(resourceId, newResourceData) {
+  console.log('Received resource details (%s) for resource id (%s)', newResourceData, resourceId);
+  
+  // store new data
+  resourceData[resourceId] = newResourceData;
+
+  // notify observers
+  var observersWatchingThisResource = resourceObservers[resourceId];
+  broadcastMessageToObserversWatchingThisResourceAsync(observersWatchingThisResource, newResourceData);
+
+  consoleLogResource();
+}  
 
 function broadcastMessageToObserversWatchingThisResourceAsync(observersWatchingThisResource, newResourceData) {
   if (observersWatchingThisResource && newResourceData) {
@@ -219,7 +199,7 @@ function broadcastMessageToObserversWatchingThisResourceAsync(observersWatchingT
   }
 }
 
-function removeClientFromResourceClients(leavingClient) {
+function removeObserverFromResourceObservers(leavingClient) {
   if (_.isObject(leavingClient) && resourceObservers) {
     for (var resourceId in resourceObservers) {
       
@@ -250,6 +230,34 @@ function removeClientFromResourceClients(leavingClient) {
   }
 }
 
+function isThisHTTPRequestAllowedToPostData(req) {
+  if (req.header('Authorization') !== authorizationHeaderKey) {
+    var ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
+
+    console.warn('Unknown server (%s) tried to post resource data', ip);
+    return false;
+  }
+  return true;
+}
+
+function isValidConnection(origin, resourceId) {
+  if (!isOriginAllowed(origin)) {
+    console.warn('[UNKNOWN CLIENT ORIGIN] WebSocket connection attempt from and unknown origin %s', origin);
+    return false;
+  }
+  
+  if (!resourceId) {
+    console.warn('[BAD REQUEST] Bad resource id (%s) is requested, closing the socket connection', resourceId);
+    return false;
+  }
+
+  return true;
+}
+
+function isOriginAllowed(origin) {
+  return !(applicationBaseUrl && origin && origin !== applicationBaseUrl);
+}
+
 function consoleLogNewConnection(webSocketClient) {
   if (_.isObject(webSocketClient)) {
     console.log('[OPEN] WebSocket connection');
@@ -260,10 +268,10 @@ function consoleLogNewConnection(webSocketClient) {
   }
 }
 
-function consoleLogLeavingClientEvent() {
+function consoleLogLeavingObserverEvent() {
   console.log('[CLOSED] WebSocket connection');
   console.log('WebSocket connections size: ' + webSocketServer.clients.length);
-  consoleLogResourceClients();
+  consoleLogResourceObservers();
 }
 
 function consoleLogResource() {
