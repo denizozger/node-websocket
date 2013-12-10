@@ -1,6 +1,6 @@
 {
-  "name": "node-websocket-match",
-  "subdomain": "node-websocket-match",
+  "name": "node-websocket",
+  "subdomain": "node-websocket",
   "version": "0.0.1-1",
   "repository": {
     "type": "git",
@@ -9,9 +9,10 @@
   "dependencies": {
     "ws": "0.4.x",
     "express": "3.x",
-    "underscore": "1.5.x",
     "request": "2.27.x",
-    "async": "0.2.x"
+    "async": "0.2.x",
+    "zmq": "~2.5.1",
+    "npmlog": "0.0.6"
   },
   "engines": {
     "node": "0.10.x",
