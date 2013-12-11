@@ -8,6 +8,7 @@ const express = require('express'),
   async = require('async'),
   zmq = require('zmq'),
   log = require('npmlog');
+  // stronglopp = require('strong-agent').profile();
 
 app.use(express.static(__dirname + '/'));
 app.use(express.json());
@@ -221,3 +222,9 @@ function logResourceObservers() {
     }
   }
 }
+
+process.on('SIGINT', function() {
+  resourceRequiredPublisher.close();
+  resourceUpdatedSubscriber.close();
+  process.exit();
+});

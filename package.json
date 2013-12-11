@@ -12,7 +12,8 @@
     "request": "2.27.x",
     "async": "0.2.x",
     "zmq": "~2.5.1",
-    "npmlog": "0.0.6"
+    "npmlog": "0.0.6",
+    "strong-agent": "~0.2.19"
   },
   "engines": {
     "node": "0.10.x",
