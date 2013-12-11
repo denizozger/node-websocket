@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded());
 app.enable('trust proxy');
 
-log.level = process.env.LOGGING_LEVEL || 'silly';
+log.level = process.env.LOGGING_LEVEL || 'verbose';
 
 const port = process.env.PORT || 5000
 
@@ -131,7 +131,7 @@ function notifyObservers(resourceId) {
 
     async.forEach(currentResourceObservers, function(thisObserver){
 
-      if (!thisObserver.disconnected) {
+      if (thisObserver.readyState !== 3) {
         sendResourceDataToObserver(thisObserver, data);
       } else {
         // We need to find the index ourselves, see https://github.com/caolan/async/issues/144
