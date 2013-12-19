@@ -32,14 +32,15 @@
       })();
       
       ws.onmessage = function (event) {
-        var li = document.createElement('li');
-        li.innerHTML = JSON.parse(event.data); // JSON parse is also very important for security
-        document.querySelector('#events').appendChild(li);
+        var li = document.getElementById('event');
+        li.innerHTML = 'Updated: ' + Date() + ':</br>' + event.data; 
       };
     </script>
   </head>
   <body>
     <h1>Node Websocket Server</h1>
-    <ul id='events'></ul>
+    <ul id='events'>
+      <li id='event'></li>
+    </ul>
   </body>
 </html>

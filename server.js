@@ -28,16 +28,11 @@ var webSocketServer = new WebSocketServer({
 });
 
 /**
- * Infrastructure and security settings
+ * Infrastructure settings and data models
  */
 const fetcherAddress = process.env.FETCHER_ADDRESS;
-const debugMode = process.env.NODE_ENV === 'development';
-
-/**
- * Data models that hold resource -> resourcedata, and resource -> observers data
- */
-var resourceData = {};
-var resourceObservers = {};
+var resourceData = {}; // key = resourceId, value = data
+var resourceObservers = {}; // key = resourceId, value = [connection1, conn2, ..]
 
 /**
  * Public Endpoints
@@ -63,26 +58,30 @@ function handleClientConnected(clientConnection) {
   }
 }
 
-const resourceRequiredPublisher = zmq.socket('pub').bind('tcp://*:5432', function(err) {
-  if (err) {
-    throw Error(err);
-  }
-  log.info('Resource Required Publisher listening for subscribers...');
+function observeResource(clientConnection, resourceId) {
+  var currentResourceObservers = resourceObservers[resourceId] || [];
+
+  currentResourceObservers.push(clientConnection);
+  resourceObservers[resourceId] = currentResourceObservers;
+
+  logNewObserver(clientConnection, resourceId);
+}
+
+// Publish a resource request for a resrouce that we don't have in memory (ie. in resourceData)
+const resourceRequiredPusher = zmq.socket('push').bind('tcp://*:5432');
+// Receive new resource data
+const resourceUpdatedPuller = zmq.socket('pull').connect('tcp://localhost:5433');
+
+resourceUpdatedPuller.on('message', function (data) {
+  handleResourceDataReceived(data);
 });
 
-const resourceUpdatedSubscriber = zmq.socket('sub').connect('tcp://localhost:5433');
-resourceUpdatedSubscriber.subscribe('');
-
-resourceUpdatedSubscriber.on('message', function (data) {
+function handleResourceDataReceived(data) {
   var resource = JSON.parse(data); 
-
-  handleResourceDataReceived(resource);
-});
-
-function handleResourceDataReceived(resource) {
-  log.silly('Received resource data for resource id (' + resource.id + ')');
+  log.verbose('Received resource data for resource id (' + resource.id + ')');
 
   storeResourceData(resource);
+
   notifyObservers(resource.id);
 }
 
@@ -91,22 +90,14 @@ function handleResourceDataReceived(resource) {
  * Implementation of public endpoints
  */
 
-var resourceData = {}; // key = resourceId, value = resourceData
-var resourceObservers = {}; // key = resourceId, value = clientConnection[]
-
-function isValidConnection(clientConnection) {
-  var resourceId = getResourceId(clientConnection);
-
-  if (!resourceId) {
-    log.warn('Bad resource id (' + resourceId + ') is requested, closing the socket connection');
-    return false;
-  }
-
-  return true;
+function sendResourceDataToObserver(clientConnection, resourceData) {
+  clientConnection.send(resourceData);  
 }
 
-function getResourceId(clientConnection) {
-  return clientConnection.upgradeReq.url.substring(1);
+function requestResource(resourceId) {
+  log.silly('Requested resource (id: ' + resourceId + ') does not exist, sending a resource request');
+
+  resourceRequiredPusher.send(JSON.stringify({id: resourceId}));
 }
 
 function storeResourceData(resource) {
@@ -115,17 +106,9 @@ function storeResourceData(resource) {
   logAllResources();
 }
 
-function observeResource(clientConnection, resourceId) {
-  var currentResourceObservers = resourceObservers[resourceId] || [];
-
-  currentResourceObservers.push(clientConnection);
-  resourceObservers[resourceId] = currentResourceObservers;
-
-  logNewObserver(clientConnection);
-}
-
 function notifyObservers(resourceId) {
   var currentResourceObservers = resourceObservers[resourceId];
+
   var data = resourceData[resourceId];
 
   if (currentResourceObservers) {
@@ -136,26 +119,22 @@ function notifyObservers(resourceId) {
         sendResourceDataToObserver(thisObserver, data);
       } else {
         // We need to find the index ourselves, see https://github.com/caolan/async/issues/144
-        // Discussion: When a resource terminates, and all observers disconnect, 
+        // Discussion: When a resource terminates, and all observers disconnect but 
           // currentResourceObservers will still be full.
-        var i = getTheIndexOfTheObserver(currentResourceObservers, thisObserver);
+        var indexOfTheObserver = getIndexOfTheObserver(currentResourceObservers, thisObserver);
 
-        unobserveResource(currentResourceObservers, resourceId, i);
+        unobserveResource(currentResourceObservers, resourceId, indexOfTheObserver);
       }
     },
     function(err){
       log.error('Cant broadcast resource data to watching observer:', err);  
     });        
   } else {
-    if (!currentResourceObservers) {
-      log.warn('No observers watching this resource');
-    } else {
-      log.warn('No new resource data (' + data + ')');
-    }
+    log.verbose('No observers watching this resource: ' + resourceId);
   }
 }
 
-function getTheIndexOfTheObserver(observersWatchingThisResource, observerToFind) {
+function getIndexOfTheObserver(observersWatchingThisResource, observerToFind) {
   for (var i = 0; i < observersWatchingThisResource.length; i++) {
     var observer = observersWatchingThisResource[i];
 
@@ -176,55 +155,67 @@ function unobserveResource(observersWatchingThisResource, resourceId, indexOfThe
 }
 
 function removeResource(resourceId) {
-  log.silly('Removing resource ( ' + resourceId + ') from memory');
+  log.verbose('Removing resource ( ' + resourceId + ') from memory');
 
   delete resourceObservers[resourceId];
   delete resourceData[resourceId];   
 }
 
-function sendResourceDataToObserver(clientConnection, resource) {
-  clientConnection.send(JSON.stringify(resource));  
+function getResourceId(clientConnection) {
+  return clientConnection.upgradeReq.url.substring(1);
 }
 
-function requestResource(resourceId) {
-  log.silly('Requested resource (id: ' + resourceId + ') does not exist, sending a resource request');
+function isValidConnection(clientConnection) {
+  var resourceId = getResourceId(clientConnection);
 
-  resourceRequiredPublisher.send(JSON.stringify({id: resourceId}));
+  if (!resourceId) {
+    log.warn('Bad resource id (' + resourceId + ') is requested, closing the socket connection');
+    return false;
+  }
+
+  return true;
 }
+
+function closeAllConnections() {
+  resourceRequiredPusher.close();
+  resourceUpdatedPuller.close(); 
+  webSocketServer.close();
+}
+
+process.on('uncaughtException', function (err) {
+  log.error('Caught exception: ' + err.stack);    
+  closeAllConnections();
+  process.exit(1);
+}); 
+
+process.on('SIGINT', function() {
+  closeAllConnections();
+  process.exit();
+});
 
 /**
  * Logging
  */
 
-function logNewObserver(clientConnection) {
-  log.silly('Requested resource id:', getResourceId(clientConnection));
-  log.info('New connection. WebSocket connections size: ', webSocketServer.clients.length);
-}
-
-function logAllResources() {
-  if (debugMode) {
-    log.silly('Current resource data:');
-    log.silly(JSON.stringify(resourceData, null, 4));
-  }
+function logNewObserver(clientConnection, resourceId) {
+  log.info('New connection for ' + resourceId + '. This resource\'s observers: ' + 
+    resourceObservers[resourceId].length + ', Total observers : ', webSocketServer.clients.length);
 }
 
 function logRemovedObserver() {
-  log.info('Connection closed. WebSocket connections size: ', webSocketServer.clients.length);
+  log.verbose('Connection closed. Total connections: ', webSocketServer.clients.length);
   logResourceObservers();
 }
 
 function logResourceObservers() {
-  if (debugMode) {
-    for (var resourceId in resourceObservers) {
-      if (resourceObservers.hasOwnProperty(resourceId)) {
-        log.info(resourceObservers[resourceId].length + ' observers are watching ' + resourceId );
-      }
+  for (var resourceId in resourceObservers) {
+    if (resourceObservers.hasOwnProperty(resourceId)) {
+      log.verbose(resourceObservers[resourceId].length + ' observers are watching ' + resourceId );
     }
   }
 }
 
-process.on('SIGINT', function() {
-  resourceRequiredPublisher.close();
-  resourceUpdatedSubscriber.close();
-  process.exit();
-});
+function logAllResources() {
+    log.silly('Total resources in memory: ' + Object.keys(resourceData).length);
+  // log.silly(JSON.stringify(resourceData, null, 4));
+}
