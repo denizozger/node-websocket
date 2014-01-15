@@ -24,7 +24,7 @@ Go to [localhost:5000/?matchesfeed/8/matchcentre](localhost:5000/?matchesfeed/8/
 When you have all three applications, you should start node-socketio as:
 
 ``` bash
-PORT=5000 NODE_ENV=development node --harmony server.js
+PORT=5000 node --harmony server.js
 ```
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/denizozger/node-websocket/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
