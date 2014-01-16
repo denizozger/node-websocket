@@ -30,7 +30,6 @@ var webSocketServer = new WebSocketServer({
 /**
  * Infrastructure settings and data models
  */
-const fetcherAddress = process.env.FETCHER_ADDRESS;
 var resourceData = {}; // key = resourceId, value = data
 var resourceObservers = {}; // key = resourceId, value = [connection1, conn2, ..]
 
