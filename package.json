@@ -11,9 +11,9 @@
     "express": "3.x",
     "request": "2.27.x",
     "async": "0.2.x",
-    "zmq": "~2.5.1",
+    "zmq": "~2.8.0",
     "npmlog": "0.0.6",
-    "strong-agent": "~0.2.19"
+    "strong-agent": "~1.0.3"
   },
   "engines": {
     "node": "0.10.x",
