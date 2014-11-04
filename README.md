@@ -12,9 +12,11 @@ brew install zeromq
 Alternatively: http://zeromq.org/intro:get-the-software
 
 ``` bash
-npm install
+sudo npm install
 node --harmony server.js
 ```
+
+Module versions might be old when you install this application, so especially if you get node-gyp compilation errors after installing modules, try updating module versions of related packages on package.json
 
 ## How it works
 
