@@ -8,7 +8,7 @@ const express = require('express'),
   async = require('async'),
   zmq = require('zmq'),
   log = require('npmlog');
-  // stronglopp = require('strong-agent').profile();
+  // strongloop = require('strong-agent').profile();
 
 app.use(express.static(__dirname + '/'));
 app.use(express.json());
@@ -72,6 +72,7 @@ const resourceRequiredPusher = zmq.socket('push').bind('tcp://*:5432');
 const resourceUpdatedPuller = zmq.socket('pull').connect('tcp://localhost:5433');
 
 resourceUpdatedPuller.on('message', function (data) {
+  
   handleResourceDataReceived(data);
 });
 

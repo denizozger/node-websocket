@@ -28,7 +28,7 @@ Please see [node-fetcher](https://github.com/denizozger/node-fetcher) and [node-
 4. If some-key's data is not found, then requests it with via a socket from a specific server, ie. [node-fetcher](https://github.com/denizozger/node-fetcher)
 5. Waits to receive data for some-key, over a socket. When data is received, transmits it to clients who are connected via some-key.
 
-Go to [localhost:5000/?matchesfeed/8/matchcentre](localhost:5000/?matchesfeed/8/matchcentre) for a demo
+Go to [localhost:5000/?test1](localhost:5000/?test1) for a demo
   
 When you have all three applications, you should start node-socketio as:
 
