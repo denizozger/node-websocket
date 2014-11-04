@@ -4,6 +4,13 @@ This Node application perioducally receives JSON data from another web applicati
 
 # Running Locally
 
+Install ZMQ first
+
+```bash
+brew install zeromq
+```
+Alternatively: http://zeromq.org/intro:get-the-software
+
 ``` bash
 npm install
 node --harmony server.js
